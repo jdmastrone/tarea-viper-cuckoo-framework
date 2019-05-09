@@ -412,7 +412,7 @@ class FileView(LoginRequiredMixin, TemplateView):
             malware_obj = malware[0]
         except IndexError:
             raise Http404("could not find file for sha256 hash: {}".format(sha256))
-	
+
         note_list = []
         notes = malware_obj.note
         if notes:
@@ -431,7 +431,7 @@ class FileView(LoginRequiredMixin, TemplateView):
             malware = db.find(key='sha256', value=sha256)
             malware_obj = malware[0]
             malwarevt = db.get_malwarevt(malware_obj.malwarevt[0].id)
-    
+
         malwarevtsc_list = []
         malwarevtsc = malware_obj.malwarevtsc
         if malwarevtsc:
@@ -454,6 +454,10 @@ class FileView(LoginRequiredMixin, TemplateView):
         ruta = '{0}/tasks/report/{1}'.format(cfg.cuckoo.cuckoo_host, str(malware_obj.task_id))
         resp = requests.get(ruta)
         jdata = resp.json()
+        apis_list = []
+        for apis in jdata['behavior']['apistats']:
+            for api in jdata['behavior']['apistats'][apis]:
+                apis_list.append({'api': api})
         fcr_list = []
         for fcr in jdata['behavior']['summary']['file_created']:
             fcr_list.append({'fcr': fcr})
@@ -508,7 +512,8 @@ class FileView(LoginRequiredMixin, TemplateView):
                                                'fr_list': fr_list,
                                                'rr_list': rr_list,
                                                'de_list': de_list,
-					       'malwarevt': malwarevt,
+                                               'apis_list': apis_list,
+					                           'malwarevt': malwarevt,
                                                'note_list': note_list,
                                                'malwarevtsc_list': malwarevtsc_list,
                                                'tag_list': tag_list,
@@ -952,4 +957,3 @@ def update_vt_value(file_hash,project,sha256):
                  db.update_malwarevtsc(sha256, antivirus, detected, version, result, update)
      except:
          print('Error de conexión')
-
