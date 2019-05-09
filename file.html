@@ -249,7 +249,7 @@
                         </tr>
 
                     </table>
-		    
+
 		    <table class="table table-hover">
 		    	<tr>
                             <td rowspan="4" class="font-weight-bold" title="Total de Análisis Realizados">Scans</td>
@@ -301,20 +301,35 @@
                         </tr>
                     </table>
 
-		    <table id="samples" class="table table-hover" cellspacing="0" width="100%">
-		        <thead>
-			    <tr>
-				<th>file_created</th>
-		            </tr>
-			</thead>
-			<tbody>
-			{% for row in fcr_list %}
-			    <tr>
-		                <td>{{ row.fcr }}</td>
-			    </tr>
-			{% endfor %}
-			</tbody>
-		    </table>
+                    <table id="samples" class="table table-hover" cellspacing="0" width="100%">
+                        <thead>
+                             <tr>
+                                   <th>apistats</th>
+                             </tr>
+                        </thead>
+                        <tbody>
+                          {% for row in apis_list %}
+                          <tr>
+                            <td>{{ row.api }}</td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                    </table>
+
+		                <table id="samples" class="table table-hover" cellspacing="0" width="100%">
+		                    <thead>
+			                       <tr>
+				                           <th>file_created</th>
+		                         </tr>
+			                  </thead>
+			                  <tbody>
+                          {% for row in fcr_list %}
+                          <tr>
+                            <td>{{ row.fcr }}</td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+		                </table>
 
 		    <table id="samples" class="table table-hover" cellspacing="0" width="100%">
 		        <thead>
