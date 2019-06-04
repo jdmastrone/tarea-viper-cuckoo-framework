@@ -15,6 +15,7 @@ import requests
 import unicodedata
 import time
 
+from oletools.olevba import VBA_Parser, TYPE_OLE, TYPE_OpenXML, TYPE_Word2003_XML, TYPE_MHTML
 from datetime import datetime
 from operator import itemgetter
 
@@ -421,6 +422,74 @@ class FileView(LoginRequiredMixin, TemplateView):
                                   'body': note.body,
                                   'id': note.id})
 
+        tag_list = None
+        children = None
+        parent = None
+        apis_list = []
+        fcr_list = []
+        rw_list = []
+        dl_list = []
+        fo_list = []
+        fco_list = []
+        ro_list = []
+        cl_list = []
+        fw_list = []
+        fd_list = []
+        mx_list = []
+        fr_list = []
+        rr_list = []
+        de_list = []
+
+        if not malware_obj.type[:4] == 'PE32':
+            filedata = open(path, 'rb').read()
+            if malware_obj.type_olevba is None:
+                vbaparser = VBA_Parser(path, data=filedata)
+                if not vbaparser.type is None:
+                    db.update_malware_olevba(malware_obj.id,str(vbaparser.type))
+                if vbaparser.detect_vba_macros():
+                    for (filename, stream_path, vba_filename, vba_code) in vbaparser.extract_macros():
+                        db.add_malwaremacros(sha256,str(filename),str(stream_path),str(vba_filename),str(vba_code))
+                    for (type, keyword, description) in vbaparser.analyze_macros():
+                        db.add_malwareanalysismacros(sha256,str(type),str(keyword),str(description))
+        else:
+            tag_list = db.list_tags_for_malware(sha256)
+            children = db.list_children(malware_obj.id)
+            parent = db.get_parent(malware_obj.id)
+            ruta = '{0}/tasks/report/{1}'.format(cfg.cuckoo.cuckoo_host, str(malware_obj.task_id))
+            resp = requests.get(ruta)
+            if resp.status_code == 200:
+                jdata = resp.json()
+                if 'behavior' in jdata:
+                    for apis in jdata['behavior']['apistats']:
+                        for api in jdata['behavior']['apistats'][apis]:
+                            apis_list.append({'api': api})
+                    for fcr in jdata['behavior']['summary']['file_created']:
+                        fcr_list.append({'fcr': fcr})
+                    for rw in jdata['behavior']['summary']['regkey_written']:
+                        rw_list.append({'rw': rw})
+                    for dl in jdata['behavior']['summary']['dll_loaded']:
+                        dl_list.append({'dl': dl})
+                    for fo in jdata['behavior']['summary']['file_opened']:
+                        fo_list.append({'fo': fo})
+                    for fco in jdata['behavior']['summary']['file_copied']:
+                        fco_list.append({'fco': fco})
+                    for ro in jdata['behavior']['summary']['regkey_opened']:
+                        ro_list.append({'ro': ro})
+                    for cl in jdata['behavior']['summary']['command_line']:
+                        cl_list.append({'cl': cl})
+                    for fw in jdata['behavior']['summary']['file_written']:
+                        fw_list.append({'fw': fw})
+                    for fd in jdata['behavior']['summary']['file_deleted']:
+                        fd_list.append({'fd': fd})
+                    for mx in jdata['behavior']['summary']['mutex']:
+                        mx_list.append({'mx': mx})
+                    for fr in jdata['behavior']['summary']['file_read']:
+                        fr_list.append({'fr': fr})
+                    for rr in jdata['behavior']['summary']['regkey_read']:
+                        rr_list.append({'rr': rr})
+                    for de in jdata['behavior']['summary']['directory_enumerated']:
+                        de_list.append({'de': de})
+
         try:
             malwarevt = db.get_malwarevt(malware_obj.malwarevt[0].id)
             update_vt_value(path,project,sha256)
@@ -430,7 +499,10 @@ class FileView(LoginRequiredMixin, TemplateView):
             get_vt_value(path,project,sha256)
             malware = db.find(key='sha256', value=sha256)
             malware_obj = malware[0]
-            malwarevt = db.get_malwarevt(malware_obj.malwarevt[0].id)
+            try:
+                malwarevt = db.get_malwarevt(malware_obj.malwarevt[0].id)
+            except:
+                malwarevt = None
 
         malwarevtsc_list = []
         malwarevtsc = malware_obj.malwarevtsc
@@ -441,6 +513,22 @@ class FileView(LoginRequiredMixin, TemplateView):
                                          'version': scan.version,
                                          'result': scan.result,
                                          'update': scan.update})
+
+        malwaremacros_list = []
+        malwaremacros = malware_obj.malwaremacros
+        if malwaremacros:
+            for macros in malwaremacros:
+                malwaremacros_list.append({'filename': macros.filename,
+                                         'streampath': macros.streampath,
+                                         'vbafilename': macros.vbafilename,
+                                         'vbacode': macros.vbacode})
+        malwareanalysismacros_list = []
+        malwareanalysismacros = malware_obj.malwareanalysismacros
+        if malwareanalysismacros:
+            for analysismacros in malwareanalysismacros:
+                malwareanalysismacros_list.append({'type': analysismacros.type,
+                                         'keyword': analysismacros.keyword,
+                                         'description': analysismacros.description})
         module_history = []
         analysis_list = malware_obj.analysis
         if analysis_list:
@@ -448,57 +536,9 @@ class FileView(LoginRequiredMixin, TemplateView):
                 module_history.append({'id': item.id,
                                        'cmd_line': item.cmd_line})
 
-        tag_list = db.list_tags_for_malware(sha256)
-        children = db.list_children(malware_obj.id)
-        parent = db.get_parent(malware_obj.id)
-        ruta = '{0}/tasks/report/{1}'.format(cfg.cuckoo.cuckoo_host, str(malware_obj.task_id))
-        resp = requests.get(ruta)
-        jdata = resp.json()
-        apis_list = []
-        for apis in jdata['behavior']['apistats']:
-            for api in jdata['behavior']['apistats'][apis]:
-                apis_list.append({'api': api})
-        fcr_list = []
-        for fcr in jdata['behavior']['summary']['file_created']:
-            fcr_list.append({'fcr': fcr})
-        rw_list = []
-        for rw in jdata['behavior']['summary']['regkey_written']:
-            rw_list.append({'rw': rw})
-        dl_list = []
-        for dl in jdata['behavior']['summary']['dll_loaded']:
-            dl_list.append({'dl': dl})
-        fo_list = []
-        for fo in jdata['behavior']['summary']['file_opened']:
-            fo_list.append({'fo': fo})
-        fco_list = []
-        for fco in jdata['behavior']['summary']['file_copied']:
-            fco_list.append({'fco': fco})
-        ro_list = []
-        for ro in jdata['behavior']['summary']['regkey_opened']:
-            ro_list.append({'ro': ro})
-        cl_list = []
-        for cl in jdata['behavior']['summary']['command_line']:
-            cl_list.append({'cl': cl})
-        fw_list = []
-        for fw in jdata['behavior']['summary']['file_written']:
-            fw_list.append({'fw': fw})
-        fd_list = []
-        for fd in jdata['behavior']['summary']['file_deleted']:
-            fd_list.append({'fd': fd})
-        mx_list = []
-        for mx in jdata['behavior']['summary']['mutex']:
-            mx_list.append({'mx': mx})
-        fr_list = []
-        for fr in jdata['behavior']['summary']['file_read']:
-            fr_list.append({'fr': fr})
-        rr_list = []
-        for rr in jdata['behavior']['summary']['regkey_read']:
-            rr_list.append({'rr': rr})
-        de_list = []
-        for de in jdata['behavior']['summary']['directory_enumerated']:
-            de_list.append({'de': de})
-
         return render(request, template_name, {'malware': malware_obj,
+                                               'malwaremacros_list': malwaremacros_list,
+                                               'malwareanalysismacros_list': malwareanalysismacros_list,
                                                'fcr_list': fcr_list,
                                                'rw_list': rw_list,
                                                'dl_list': dl_list,
@@ -522,7 +562,6 @@ class FileView(LoginRequiredMixin, TemplateView):
                                                'module_history': module_history,
                                                'project': project,
                                                'projects': get_project_list()})
-
 
 class RunModuleView(LoginRequiredMixin, TemplateView):
     """Run a module and return output"""
@@ -803,14 +842,14 @@ class CuckooCheckOrSubmitView(LoginRequiredMixin, TemplateView):
             # Submit file data to cuckoo
             uri = '{0}{1}'.format(cfg.cuckoo.cuckoo_host, '/tasks/create/file')
             s = malware_obj.type
-            if s.find('PE32+'):
-                options = {'file': (file_name, file_data),'machine': 'W764'}
+            options = {'file': (file_name, file_data)}
+            if s[:5] == 'PE32+':
+                params = {'machine': 'W764'}
+                cuckoo_response = requests.post(uri, files=options, data=params)
             else:
-                if s.find('PE32'):
-                    options = {'file': (file_name, file_data),'machine': 'W732'}
-                else:
-                    options = {'file': (file_name, file_data)}
-            cuckoo_response = requests.post(uri, files=options)
+                params = {'machine': 'W732'}
+                cuckoo_response = requests.post(uri, files=options, data=params)
+
             if cuckoo_response.status_code == 200:
                 cuckoo_id = dict(cuckoo_response.json())['task_id']
                 return HttpResponse('<a href="{0}/analysis/pending/" target="_blank"> Link To Cuckoo (pending tasks)</a>'.format(cfg.cuckoo.cuckoo_web, str(cuckoo_id)))

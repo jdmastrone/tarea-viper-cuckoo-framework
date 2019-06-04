@@ -38,7 +38,9 @@ association_table = Table(
     Column('malware_id', Integer, ForeignKey('malware.id')),
     Column('analysis_id', Integer, ForeignKey('analysis.id')),
     Column('malwarevt_id', Integer, ForeignKey('malwarevt.id')),
-    Column('malwarevtsc_id', Integer, ForeignKey('malwarevtsc.id'))
+    Column('malwarevtsc_id', Integer, ForeignKey('malwarevtsc.id')),
+    Column('malwaremacros_id', Integer, ForeignKey('malwaremacros.id')),
+    Column('malwareanalysismacros_id', Integer, ForeignKey('malwareanalysismacros.id'))
 )
 
 class Malware(Base):
@@ -60,6 +62,7 @@ class Malware(Base):
     parent = relationship('Malware', lazy='subquery', remote_side=[id])
     task_id = Column(Integer(), nullable=True)
     json_data = Column(Text(), nullable=True)
+    type_olevba = Column(Text(), nullable=True)
 
     tag = relationship(
         'Tag',
@@ -90,6 +93,20 @@ class Malware(Base):
     )
     malwarevtsc = relationship(
         'MalwareVTSc',
+        cascade='all, delete',
+        secondary=association_table,
+        lazy='subquery',
+        backref=backref('malware')
+    )
+    malwaremacros = relationship(
+        'MalwareMacros',
+        cascade='all, delete',
+        secondary=association_table,
+        lazy='subquery',
+        backref=backref('malware')
+    )
+    malwareanalysismacros = relationship(
+        'MalwareAnalysisMacros',
         cascade='all, delete',
         secondary=association_table,
         lazy='subquery',
@@ -129,7 +146,8 @@ class Malware(Base):
                  name=None,
                  parent=None,
                  task_id=None,
-                 json_data=None):
+                 json_data=None,
+                 type_olevba=None):
         self.md5 = md5
         self.sha1 = sha1
         self.crc32 = crc32
@@ -143,6 +161,7 @@ class Malware(Base):
         self.parent = parent
         self.task_id = task_id
         self.json_data = json_data
+        self.type_olevba = type_olevba
 
 
 class Tag(Base):
@@ -240,7 +259,7 @@ class MalwareVT(Base):
                  scan_id,
 		 permalink,
 		 resource,
-		 verbose_msg,               
+		 verbose_msg,
                  scan_date,
                  positives,
                  total):
@@ -256,7 +275,7 @@ class MalwareVT(Base):
 class MalwareVTSc(Base):
     __tablename__ = 'malwarevtsc'
 
-    id = Column(Integer(),primary_key=True) 
+    id = Column(Integer(),primary_key=True)
     antivirus = Column(Text(),nullable=True)
     detected = Column(Boolean(),nullable=True)
     version = Column(Text(),nullable=True)
@@ -285,6 +304,63 @@ class MalwareVTSc(Base):
         self.version = version
         self.result = result
         self.update = update
+
+class MalwareMacros(Base):
+        __tablename__ = 'malwaremacros'
+
+        id = Column(Integer(),primary_key=True)
+        filename = Column(Text(),nullable=True)
+        streampath = Column(Text(),nullable=True)
+        vbafilename = Column(Text(),nullable=True)
+        vbacode = Column(Text(),nullable=True)
+
+        def to_dict(self):
+            row_dict = {}
+            for column in self.__table__.columns:
+                value = getattr(self, column.name)
+                row_dict[column.name] = value
+
+            return row_dict
+
+        def __repr__(self):
+            return "<Malware_Macros ('{0}','{1}')>".format(self.id, self.filename)
+
+        def __init__(self,
+                     filename,
+                     streampath,
+                     vbafilename,
+                     vbacode):
+            self.filename = filename
+            self.streampath = streampath
+            self.vbafilename = vbafilename
+            self.vbacode = vbacode
+
+class MalwareAnalysisMacros(Base):
+        __tablename__ = 'malwareanalysismacros'
+
+        id = Column(Integer(),primary_key=True)
+        type = Column(Text(),nullable=True)
+        keyword = Column(Text(),nullable=True)
+        description = Column(Text(),nullable=True)
+
+        def to_dict(self):
+            row_dict = {}
+            for column in self.__table__.columns:
+                value = getattr(self, column.name)
+                row_dict[column.name] = value
+
+            return row_dict
+
+        def __repr__(self):
+            return "<Malware_AnalysisMacros ('{0}','{1}')>".format(self.id, self.type)
+
+        def __init__(self,
+                     type,
+                     keyword,
+                     description):
+            self.type = type
+            self.keyword = keyword
+            self.description = description
 
 class Database:
     # __metaclass__ = Singleton
@@ -803,13 +879,13 @@ class Database:
             session.commit()
             self.added_ids.setdefault("malwarevt", []).append(new_malwarevt.id)
         except SQLAlchemyError as e:
-            print_error("Unable to add note: {0}".format(e))
+            print_error("Unable to add virus total register: {0}".format(e))
             session.rollback()
 
     def get_malware(self, sha256):
         session = self.Session()
         malware = session.query(Malware).get(sha256)
-        
+
         if sys.version_info < (3, 0):
             # on Python2 make sure to only handle ASCII filenames
             try:
@@ -836,14 +912,14 @@ class Database:
             session.query(Malware).get(id).json_data = str(json_data)
             session.commit()
         except SQLAlchemyError as e:
-            print_error("Unable to add note: {0}".format(e))
+            print_error("Unable to update malware task: {0}".format(e))
             session.rollback()
 
 
     def get_malwarevt(self, malwarevt_id):
         session = self.Session()
         malwarevt = session.query(MalwareVT).get(malwarevt_id)
-        
+
         if sys.version_info < (3, 0):
             # on Python2 make sure to only handle ASCII filenames
             try:
@@ -873,7 +949,7 @@ class Database:
             session.query(MalwareVT).get(malwarevt_id).total = total
             session.commit()
         except SQLAlchemyError as e:
-            print_error("Unable to add note: {0}".format(e))
+            print_error("Unable to update virus total register: {0}".format(e))
             session.rollback()
 
     def list_malwarevtsc(self):
@@ -903,7 +979,7 @@ class Database:
             session.commit()
             self.added_ids.setdefault("malwarevtsc", []).append(new_malwarevtsc.id)
         except SQLAlchemyError as e:
-            print_error("Unable to add note: {0}".format(e))
+            print_error("Unable to add malware scan: {0}".format(e))
             session.rollback()
 
     def get_malwarevtsc(self, malwarevtsc_id):
@@ -950,6 +1026,111 @@ class Database:
                 session.commit()
                 self.added_ids.setdefault("malwarevtsc", []).append(new_malwarevtsc.id)
         except SQLAlchemyError as e:
-            print_error("Unable to add note: {0}".format(e))
+            print_error("Unable to update malware scan: {0}".format(e))
             session.rollback()
 
+    def list_malwaremacros(self):
+        session = self.Session()
+        rows = session.query(MalwareMacros).all()
+        return rows
+
+    def add_malwaremacros(self, sha256, filename, streampath, vbafilename, vbacode):
+        session = self.Session()
+
+        if sys.version_info < (3, 0):
+            # on Python2 make sure to only handle ASCII
+            try:
+                title.decode('ascii')
+                body.decode('ascii')
+            except UnicodeError as err:
+                raise Python2UnsupportedUnicode("Non ASCII character(s) in Notes not supported on Python2.\n"
+                                                "Please use Python >= 3.4".format(err), "error")
+
+        malware_entry = session.query(Malware).filter(Malware.sha256 == sha256).first()
+        if not malware_entry:
+            return False
+
+        try:
+            new_malwaremacros = MalwareMacros(filename, streampath, vbafilename, vbacode)
+            malware_entry.malwaremacros.append(new_malwaremacros)
+            session.commit()
+            self.added_ids.setdefault("malwaremacros", []).append(new_malwaremacros.id)
+        except SQLAlchemyError as e:
+            print_error("Unable to add malware macros: {0}".format(e))
+            session.rollback()
+
+    def get_malwaremacros(self, malwaremacros_id):
+        session = self.Session()
+        malwaremacros = session.query(MalwareMacros).get(malwaremacros_id)
+
+        if sys.version_info < (3, 0):
+            # on Python2 make sure to only handle ASCII filenames
+            try:
+                note.title.decode('ascii')
+                note.body.decode('ascii')
+            except UnicodeError as err:
+                raise Python2UnsupportedUnicode("Non ASCII character(s) in Notes not supported on Python2.\n"
+                                                "Please use Python >= 3.4".format(err), "error")
+        return malwaremacros
+
+    def list_malwareanalysismacros(self):
+        session = self.Session()
+        rows = session.query(MalwareAnalysisMacros).all()
+        return rows
+
+    def add_malwareanalysismacros(self, sha256, type, keyword, description):
+        session = self.Session()
+
+        if sys.version_info < (3, 0):
+            # on Python2 make sure to only handle ASCII
+            try:
+                title.decode('ascii')
+                body.decode('ascii')
+            except UnicodeError as err:
+                raise Python2UnsupportedUnicode("Non ASCII character(s) in Notes not supported on Python2.\n"
+                                                "Please use Python >= 3.4".format(err), "error")
+
+        malware_entry = session.query(Malware).filter(Malware.sha256 == sha256).first()
+        if not malware_entry:
+            return False
+
+        try:
+            new_malwareanalysismacros = MalwareAnalysisMacros(type, keyword, description)
+            malware_entry.malwareanalysismacros.append(new_malwareanalysismacros)
+            session.commit()
+            self.added_ids.setdefault("malwareanalysismacros", []).append(new_malwareanalysismacros.id)
+        except SQLAlchemyError as e:
+            print_error("Unable to add malware analysis macros: {0}".format(e))
+            session.rollback()
+
+    def get_malwareanalysismacros(self, malwareanalysismacros_id):
+        session = self.Session()
+        malwareanalysismacros = session.query(MalwareAnalysisMacros).get(malwareanalysismacros_id)
+
+        if sys.version_info < (3, 0):
+            # on Python2 make sure to only handle ASCII filenames
+            try:
+                note.title.decode('ascii')
+                note.body.decode('ascii')
+            except UnicodeError as err:
+                raise Python2UnsupportedUnicode("Non ASCII character(s) in Notes not supported on Python2.\n"
+                                                "Please use Python >= 3.4".format(err), "error")
+        return malwareanalysismacros
+
+    def update_malware_olevba(self, id, type_olevba):
+        session = self.Session()
+        if sys.version_info < (3, 0):
+            # on Python2 make sure to only handle ASCII
+            try:
+                title.decode('ascii')
+                body.decode('ascii')
+            except UnicodeError as err:
+                raise Python2UnsupportedUnicode("Non ASCII character(s) in Notes not supported on Python2.\n"
+                                                "Please use Python >= 3.4".format(err), "error")
+
+        try:
+            session.query(Malware).get(id).type_olevba = type_olevba
+            session.commit()
+        except SQLAlchemyError as e:
+            print_error("Unable to update type olevba: {0}".format(e))
+            session.rollback()
