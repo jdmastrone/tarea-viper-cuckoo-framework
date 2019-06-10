@@ -455,40 +455,41 @@ class FileView(LoginRequiredMixin, TemplateView):
             tag_list = db.list_tags_for_malware(sha256)
             children = db.list_children(malware_obj.id)
             parent = db.get_parent(malware_obj.id)
-            ruta = '{0}/tasks/report/{1}'.format(cfg.cuckoo.cuckoo_host, str(malware_obj.task_id))
-            resp = requests.get(ruta)
-            if resp.status_code == 200:
-                jdata = resp.json()
-                if 'behavior' in jdata:
-                    for apis in jdata['behavior']['apistats']:
-                        for api in jdata['behavior']['apistats'][apis]:
-                            apis_list.append({'api': api})
-                    for fcr in jdata['behavior']['summary']['file_created']:
-                        fcr_list.append({'fcr': fcr})
-                    for rw in jdata['behavior']['summary']['regkey_written']:
-                        rw_list.append({'rw': rw})
-                    for dl in jdata['behavior']['summary']['dll_loaded']:
-                        dl_list.append({'dl': dl})
-                    for fo in jdata['behavior']['summary']['file_opened']:
-                        fo_list.append({'fo': fo})
-                    for fco in jdata['behavior']['summary']['file_copied']:
-                        fco_list.append({'fco': fco})
-                    for ro in jdata['behavior']['summary']['regkey_opened']:
-                        ro_list.append({'ro': ro})
-                    for cl in jdata['behavior']['summary']['command_line']:
-                        cl_list.append({'cl': cl})
-                    for fw in jdata['behavior']['summary']['file_written']:
-                        fw_list.append({'fw': fw})
-                    for fd in jdata['behavior']['summary']['file_deleted']:
-                        fd_list.append({'fd': fd})
-                    for mx in jdata['behavior']['summary']['mutex']:
-                        mx_list.append({'mx': mx})
-                    for fr in jdata['behavior']['summary']['file_read']:
-                        fr_list.append({'fr': fr})
-                    for rr in jdata['behavior']['summary']['regkey_read']:
-                        rr_list.append({'rr': rr})
-                    for de in jdata['behavior']['summary']['directory_enumerated']:
-                        de_list.append({'de': de})
+            if not malware_obj.task_id is None:
+                ruta = '{0}/tasks/report/{1}'.format(cfg.cuckoo.cuckoo_host, str(malware_obj.task_id))
+                resp = requests.get(ruta)
+                if resp.status_code == 200:
+                    jdata = resp.json()
+                    if 'behavior' in jdata:
+                        for apis in jdata['behavior']['apistats']:
+                            for api in jdata['behavior']['apistats'][apis]:
+                                apis_list.append({'api': api})
+                        for fcr in jdata['behavior']['summary']['file_created']:
+                            fcr_list.append({'fcr': fcr})
+                        for rw in jdata['behavior']['summary']['regkey_written']:
+                            rw_list.append({'rw': rw})
+                        for dl in jdata['behavior']['summary']['dll_loaded']:
+                            dl_list.append({'dl': dl})
+                        for fo in jdata['behavior']['summary']['file_opened']:
+                            fo_list.append({'fo': fo})
+                        for fco in jdata['behavior']['summary']['file_copied']:
+                            fco_list.append({'fco': fco})
+                        for ro in jdata['behavior']['summary']['regkey_opened']:
+                            ro_list.append({'ro': ro})
+                        for cl in jdata['behavior']['summary']['command_line']:
+                            cl_list.append({'cl': cl})
+                        for fw in jdata['behavior']['summary']['file_written']:
+                            fw_list.append({'fw': fw})
+                        for fd in jdata['behavior']['summary']['file_deleted']:
+                            fd_list.append({'fd': fd})
+                        for mx in jdata['behavior']['summary']['mutex']:
+                            mx_list.append({'mx': mx})
+                        for fr in jdata['behavior']['summary']['file_read']:
+                            fr_list.append({'fr': fr})
+                        for rr in jdata['behavior']['summary']['regkey_read']:
+                            rr_list.append({'rr': rr})
+                        for de in jdata['behavior']['summary']['directory_enumerated']:
+                            de_list.append({'de': de})
 
         try:
             malwarevt = db.get_malwarevt(malware_obj.malwarevt[0].id)
